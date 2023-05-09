@@ -7,7 +7,7 @@ import os
 from datetime import datetime
 import fiona
 
-def gdb_to_gpkg(gdb_fname, gdb_layers, gpkg_name):
+def fgdb_to_gpkg(gdb_fname, gdb_layers, gpkg_name):
     """[summary]
 
     Parameters
@@ -56,6 +56,56 @@ def gdb_to_gpkg(gdb_fname, gdb_layers, gpkg_name):
     
     return(logdf)
 
+def postgis_to_gpkg(conn, schema, gdb_layers, gpkg_name):
+    """[summary]
+
+    Parameters
+    ----------
+    conn : [type]
+        [description]
+    gdb_layers : [type]
+        [description]
+    gpkg_name : [type]
+        [description]
+    """
+    # Create a log list
+    log = []
+    print("  creating " + gpkg_name)
+    # Loop through the geodatabase layers
+    for l in gdb_layers:
+        # Open layer and get some log values
+        print("    loading layer " + l)
+        try:
+            gdf = gpd.GeoDataFrame.from_postgis("SELECT * FROM {0}.{1};".format(
+                schema, l), conn, geom_col='geom', index_col='ogc_fid',
+                                                coerce_float=False)
+            n_feat = gdf.shape[0]
+            geometry = gdf.geom_type[1]
+            # If it has geometry, write to geopackage (GPKG driver allows write)
+            if geometry != 'None':
+                gdf.to_file(gpkg_name, layer=l, driver="GPKG")
+                added = 'True'
+            # If not exclude
+            else:
+                added = 'False'
+                print("    layer excluded! " + l)
+        # If there was a geometry or other exception exclude
+        except:
+            geometry = 'Exception'
+            n_feat = 0
+            added = 'False'
+            print("    layer excluded! " + l)
+            pass
+
+        # Fill the log
+        log.append([conn.url.database, l, geometry, n_feat, added, gpkg_name,
+            datetime.now()])
+    
+    # Create and return log dataframe
+    logdf = pd.DataFrame(log, columns=['origin_gdb','layer_name','geom_type',
+        'n_features','added_to_gpkg','gpkg_fname','dt_added'])
+    
+    return(logdf)
     
 def gpkg_metadata_table(gpkg_path, gpkg_abstract, gpkg_tags,
     gdb_list=[], package_name=None):
@@ -129,3 +179,22 @@ def gpkg_metadata_table(gpkg_path, gpkg_abstract, gpkg_tags,
         'license','access_use_text','date_read'])
         
     return mdf
+
+def gpkg_to_geojson(gpkg, layername, dirname='tmp'):
+    """Read a layer from a geopackage to a geodataframe and
+    write out to a geojson file.
+
+    Parameters
+    ----------
+    gpkg : string
+        Geopackage file name
+    layername : string
+        Name of the desired geopackage layer
+    dirname : string
+        Name of the output directory, by default 'tmp/'
+    """
+    gdf = gpd.read_file(gpkg, layer=layername)
+    fname = os.path.join(dirname, layername + '.geojson')
+    os.makedirs(os.path.dirname(fname), exist_ok=True)
+    gdf.to_file(fname, driver='GeoJSON')
+    return(fname)

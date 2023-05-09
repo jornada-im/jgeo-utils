@@ -3,50 +3,35 @@ Some of this relies on the ArcGIS python API, which is documented here:
 
     https://developers.arcgis.com/python/api-reference/index.html
 
+Some guides are here:
 
+    https://developers.arcgis.com/python/guide/accessing-and-creating-content/
 """
 import os
 import geopandas as gpd
 import fiona
 from arcgis import features as fs
+import xml.etree.ElementTree as ET
+  
 
-def gpkglayer_to_geojson(gpkg, layername, dirname='tmp'):
-    """Read a layer from a geopackage to a geodataframe and
-    write out to a geojson file.
-
-    Parameters
-    ----------
-    gpkg : string
-        Geopackage file name
-    layername : string
-        Name of the desired geopackage layer
-    dirname : string
-        Name of the output directory, by default 'tmp/'
-    """
-    gdf = gpd.read_file(gpkg, layer=layername)
-    fname = os.path.join(dirname, layername + '.geojson')
-    os.makedirs(os.path.dirname(fname), exist_ok=True)
-    gdf.to_file(fname, driver='GeoJSON')
-    return(fname)
-    
 def add_geojson_item(fname, gis, gis_folder, properties={},
                      publish_after=False, remove_after=False):
     """Create a geojson item in ArcGIS (online or enterprise)
 
     Parameters
     ----------
-    fname : string
-        Name and path of a GeoJSON file to upload to ArcGIS
-    gis : object
-        A logged-in ArcGIS.gis instance
-    gis_folder : string 
-        Name of the folder in gis to upload the GeoJSON to 
-    title : string, optional
-        Title for the GeoJSON, by default None
-    desc : String, optional
-        Description for the GeoJSON, by default None
-    tags : list of strings, optional
-        Tags for the GeoJSON, by default None
+    fname : _type_
+        _description_
+    gis : _type_
+        _description_
+    gis_folder : _type_
+        _description_
+    properties : dict, optional
+        _description_, by default {}
+    publish_after : bool, optional
+        _description_, by default False
+    remove_after : bool, optional
+        _description_, by default False
     """
     if bool(properties):
         properties.update({'type': 'GeoJson'})
@@ -61,7 +46,7 @@ def add_geojson_item(fname, gis, gis_folder, properties={},
         os.remove(fname)
     # Publish if requested and return
     if publish_after:
-        item_p = item.publish(file_type='geojson')
+        item_p = item.publish(overwrite=True)#xfile_type='geojson')
         return(item, item_p)
     else:
         return(item)
@@ -242,4 +227,57 @@ def geopkg_to_single_fs(gis, geojson_folder, gpkg, metadf,
 
     return(itemList, fsList)
 
+def gdf_to_single_fs(gis, agol_folder, gdf, metadf,
+                     tags=['Jornada', 'jgeo'], local_folder='tmp/',
+                     clean_local=False):
+    """[summary]
 
+    Parameters
+    ----------
+    gis : [type]
+        [description]
+    geojson_folder : [type]
+        [description]
+    gpkg : [type]
+        [description]
+    metadf : [type]
+        [description]
+    clean_local : bool, optional
+        [description], by default False
+    """
+    layer_properties={'title':metadf.f_table_name[0],
+                      'description':metadf.abstract[0],
+                      'tags':tags}
+    try:
+        layer_geojson = geodf_to_geojson(gdf, lyr, dirname=local_folder)
+        print(layer_geojson)
+        # Put a geojson on AGOL. This just creates a static geoJSON item
+        # then publishes it as a feature service
+        item, item_fs = add_geojson_item(layer_geojson, gis, gis_folder,
+            properties=layer_properties,
+            publish_after=True, remove_after=clean_local)
+    except:
+        print('skipping layer: ' +  layer_properties['title'])
+        pass
+    return(item, item_fs)
+
+
+def qmd_to_agol(agol_title, qmd):
+    """_summary_
+
+    Parameters
+    ----------
+    agol_title : _type_
+        _description_
+    qmd : _type_
+        _description_
+    """
+    root = ET.fromstring(qmd)
+    kw = root.find('keywords')
+    props = {
+        "title":agol_title,
+        "description":root.find('abstract').text,
+        "tags":','.join([e.text for e in kw.findall('keyword')]),
+        "copyrightText":root.find('rights').text
+        }
+    return(props)
