@@ -262,7 +262,7 @@ def gdf_to_single_fs(gis, agol_folder, gdf, metadf,
     return(item, item_fs)
 
 
-def qmd_to_agol(agol_title, qmd):
+def qmd_to_agol_prop(agol_title, qmd):
     """_summary_
 
     For other properties see here:
