@@ -5,16 +5,16 @@ Some of this relies on the ArcGIS python API, which is documented here:
 
 Some guides are here:
 
-    https://developers.arcgis.com/python/guide/accessing-and-creating-content/
+    https://developers.arcgis.com/python/guide/accessing-and-creating-content
+
 """
 import os
 import geopandas as gpd
 import fiona
 from arcgis import features as fs
 import xml.etree.ElementTree as ET
-  
 
-def add_geojson_item(fname, gis, gis_folder, properties={},
+def add_geojson_item(fname, gis, gis_folder, properties=None,
                      publish_after=False, remove_after=False):
     """Create a geojson item in ArcGIS (online or enterprise)
 
@@ -265,6 +265,10 @@ def gdf_to_single_fs(gis, agol_folder, gdf, metadf,
 def qmd_to_agol(agol_title, qmd):
     """_summary_
 
+    For other properties see here:
+
+    https://developers.arcgis.com/python/api-reference/arcgis.gis.toc.html#arcgis.gis.ContentManager.add
+
     Parameters
     ----------
     agol_title : _type_
@@ -272,12 +276,14 @@ def qmd_to_agol(agol_title, qmd):
     qmd : _type_
         _description_
     """
-    root = ET.fromstring(qmd)
-    kw = root.find('keywords')
+    root = ET.fromstring(qmd) # read qmd XML
+    kw = root.find('keywords') # extract keywords tree
+    # Make a properties dictionary
     props = {
         "title":agol_title,
         "description":root.find('abstract').text,
         "tags":','.join([e.text for e in kw.findall('keyword')]),
-        "copyrightText":root.find('rights').text
+        "licenseInfo":root.find('rights').text,
+        "typeKeywords":"Geoscientific, Environment" #not sure if this is right
         }
     return(props)
