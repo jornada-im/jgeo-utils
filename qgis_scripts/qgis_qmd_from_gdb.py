@@ -1,3 +1,8 @@
+"""
+This is to pull existing metadata from a Jornada File Geodatabase (gdb)
+and create a qmd file
+"""
+
 from qgis.core import *
 from qgis.utils import *
 import glob
