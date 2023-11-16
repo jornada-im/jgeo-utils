@@ -1,6 +1,6 @@
 """
 This is to pull existing metadata from a Jornada File Geodatabase (gdb)
-and create a qmd file
+and create a qmd file for each layer (if not empty)
 """
 
 from qgis.core import *
