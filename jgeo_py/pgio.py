@@ -55,4 +55,36 @@ def table_to_geojson(conn, schema, layer, outdir='tmp'):
     fname = os.path.join(outdir, layer + '.geojson')
     os.makedirs(os.path.dirname(fname), exist_ok=True)
     gdf.to_file(fname, driver='GeoJSON')
-    return(fname) 
+    return(fname)
+
+
+def upsert_df_to_table(df, key, engine, tmp_table, dest_table,
+                       schema='public'):
+    """Update/insert ('upsert) a pandas dataframe into a PostgreSQL table
+
+    Since the pandas `to_sql` method has no method to update/insert, this
+    essentially creates a temporary table to hold the updated dataframe rows,
+    deletes the matching rows (by key) in the destination table, and then
+    appends the new/updated rows.
+    """
+    # Make sure the updated dataframe has the 'key' column as index
+    df = df.set_index(key)
+
+    # Put the updated dataframe into a temporary PG table
+    df.to_sql(tmp_table, engine, if_exists='replace', index=True, schema=schema)
+
+    # Get the connection/transaction objects
+    conn = engine.connect()
+    trans = conn.begin()
+
+    try:
+        # Delete the rows in the destination table that we are going to "upsert"
+        conn.execute(sqla.text("DELETE FROM {0}.{1} WHERE {2} IN (SELECT {2} FROM {0}.{3})".format(
+            schema, dest_table, key, tmp_table)))
+        trans.commit()
+
+        # Insert the changed rows
+        df.to_sql(dest_table, engine, if_exists='append', index=True)
+    except:
+        trans.rollback()
+        raise
